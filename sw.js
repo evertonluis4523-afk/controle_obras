@@ -1,7 +1,7 @@
 /* RM Estruturas — Controle de Obras · service worker
    Troque a versao (v1 -> v2 ...) sempre que publicar alteracoes,
    para forcar a atualizacao do cache nos aparelhos ja instalados. */
-const CACHE = 'rm-obras-v5';
+const CACHE = 'rm-obras-v6';
 
 const APP_SHELL = [
   './',
