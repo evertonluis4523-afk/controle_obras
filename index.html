@@ -36,7 +36,7 @@ button{font-family:inherit}
 input,textarea,select{font-family:inherit;color:inherit}
 
 /* ---------- App bar ---------- */
-.appbar{position:sticky;top:0;z-index:40;background:var(--ink);color:#fff;border-bottom:3px solid var(--red)}
+.appbar{position:sticky;top:0;z-index:40;background:var(--surface);color:var(--ink);border-bottom:1px solid var(--line)}
 .appbar .in{max-width:1180px;margin:0 auto;display:flex;align-items:center;gap:14px;padding:9px 18px;flex-wrap:wrap}
 .appbar .brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;font-size:13px}
 .appbar .brand b{color:var(--red);font-weight:800}
@@ -49,6 +49,10 @@ input,textarea,select{font-family:inherit;color:inherit}
 .btn.primary{background:var(--red);border-color:var(--red)}
 .btn.primary:hover{background:var(--red-d)}
 .btn.ghost{background:transparent}
+.appbar .btn{background:transparent;border-color:var(--line);color:var(--ink)}
+.appbar .btn:hover{background:var(--line-2);border-color:#d2d2cc}
+.appbar .btn.primary{background:var(--red);border-color:var(--red);color:#fff}
+.appbar .btn.primary:hover{background:var(--red-d)}
 .btn svg{width:15px;height:15px}
 
 /* ---------- Sheet ---------- */
