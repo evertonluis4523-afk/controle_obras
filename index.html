@@ -51,6 +51,27 @@ input,textarea,select{font-family:inherit;color:inherit}
 .appbar .btn.primary:hover{background:var(--red-d)}
 .btn svg{width:15px;height:15px}
 
+/* ---------- Login ---------- */
+.login{position:fixed;inset:0;z-index:90;background:var(--ink);display:flex;align-items:center;justify-content:center;padding:24px}
+.login.hide{display:none}
+.login::before{content:"";position:absolute;inset:0;background:
+   radial-gradient(60% 50% at 80% 0%,rgba(140,29,24,.22),transparent 60%),
+   radial-gradient(50% 40% at 0% 100%,rgba(140,29,24,.14),transparent 55%)}
+.login-card{position:relative;width:100%;max-width:380px;background:var(--surface);border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.5);border-top:4px solid var(--red)}
+.login-card .lc-head{padding:30px 30px 22px;text-align:center;border-bottom:1px solid var(--line);position:relative}
+.login-card .lc-head::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;background:linear-gradient(90deg,var(--red) 0 33%,var(--gray) 33% 66%,var(--red) 66% 100%)}
+.login-card .lc-head img{height:62px;margin-bottom:14px}
+.login-card .lc-head .ttl{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--red);font-weight:800}
+.login-card .lc-head .sub{font-size:12px;color:var(--muted);margin-top:4px}
+.login-card .lc-body{padding:26px 30px 30px}
+.login-card .lc-body .f{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.login-card .lc-body .f .lab{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.login-card .lc-body .f input{border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;font-weight:600}
+.login-card .lc-body .f input:focus{outline:0;border-color:var(--red);box-shadow:0 0 0 2px var(--red-soft)}
+.login-card .lc-body .submit{width:100%;margin-top:6px;justify-content:center;padding:12px}
+.login-err{display:none;background:var(--red-soft);color:var(--red-d);border:1px solid #f1c9c7;border-radius:9px;padding:10px 12px;font-size:12.5px;font-weight:600;margin-bottom:14px}
+.login-err.on{display:block}
+
 /* ---------- Sheet ---------- */
 .wrap{max-width:1180px;margin:22px auto;padding:0 18px 80px}
 .sheet{background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);overflow:hidden}
@@ -382,6 +403,32 @@ table.items td.l{text-align:left}
 </head>
 <body>
 
+<!-- ================= LOGIN ================= -->
+<div class="login" id="loginScreen">
+  <div class="login-card">
+    <div class="lc-head">
+      <img id="loginLogo" alt="RM Estruturas">
+      <div class="ttl">RM Estruturas</div>
+      <div class="sub">Controle de Obras · acesso restrito</div>
+    </div>
+    <div class="lc-body">
+      <div class="login-err" id="loginErr"></div>
+      <div class="f">
+        <span class="lab">E-mail</span>
+        <input id="li_user" type="email" autocomplete="username" placeholder="voce@empresa.com" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <div class="f">
+        <span class="lab">Senha</span>
+        <input id="li_pass" type="password" autocomplete="current-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+      </div>
+      <button class="btn-act save submit" id="loginBtn" onclick="doLogin()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+        Entrar
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="appbar">
   <div class="in">
     <div class="brand"><img id="appbarLogo" class="rm-logo" alt="RM Estruturas"><span><b>RM</b> · Controle de Obras</span></div>
@@ -393,6 +440,7 @@ table.items td.l{text-align:left}
     <button class="btn ghost" onclick="relTodas()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h6"/></svg>Relatórios</button>
     <button class="btn cloudbtn" id="cloudBtn" onclick="cloudClick()" title="Sincronização com a nuvem"><span class="clouddot" id="cloudDot"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg><span id="cloudLabel">Nuvem</span></button>
     <button class="btn primary" onclick="addObra()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Nova obra</button>
+    <button class="btn ghost" onclick="doLogout()" title="Sair"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Sair</button>
   </div>
 </div>
 
@@ -409,7 +457,7 @@ table.items td.l{text-align:left}
       <div>Controle financeiro de obras vendidas</div>
       <div class="doc-tag">Obras &middot; Notas &middot; Recebimentos</div>
     </div>
-  <script>document.getElementById("appbarLogo").src = document.getElementById("printHeadLogo").src;</script>
+  <script>document.getElementById("appbarLogo").src = document.getElementById("printHeadLogo").src; document.getElementById("loginLogo").src = document.getElementById("printHeadLogo").src;</script>
   </div>
 
   <div class="kpis" id="kpis"></div>
@@ -1119,6 +1167,28 @@ const COL='obras_rm';
 let fdb=null, fst=null, fauth=null, cloudState='local';
 let _lastPushed={}, _cloudKnown=new Set(), pushT=null, _applyingRemote=false;
 
+/* ================= AUTH ================= */
+function showLogin(show){ document.getElementById('loginScreen').classList.toggle('hide', !show); }
+function doLogin(){
+  const u=document.getElementById('li_user').value.trim(), p=document.getElementById('li_pass').value;
+  const err=document.getElementById('loginErr');
+  err.classList.remove('on');
+  if(!fauth){ err.textContent='Autenticação indisponível.'; err.classList.add('on'); return; }
+  document.getElementById('loginBtn').disabled=true;
+  fauth.signInWithEmailAndPassword(u,p)
+    .then(()=>{ err.classList.remove('on'); })
+    .catch(e=>{ err.textContent = authMsg(e.code); err.classList.add('on'); })
+    .finally(()=>{ document.getElementById('loginBtn').disabled=false; });
+}
+function authMsg(code){
+  const m={'auth/invalid-email':'E-mail inválido.','auth/user-not-found':'Usuário não encontrado.',
+    'auth/wrong-password':'Senha incorreta.','auth/invalid-credential':'E-mail ou senha incorretos.',
+    'auth/too-many-requests':'Muitas tentativas. Aguarde um momento.','auth/network-request-failed':'Sem conexão.'};
+  return m[code]||'Não foi possível entrar. Tente novamente.';
+}
+function doLogout(){ if(fauth) fauth.signOut(); document.getElementById('li_pass').value=''; }
+window.doLogin=doLogin; window.doLogout=doLogout;
+
 function setCloud(state,msg){
   cloudState=state;
   const dot=document.getElementById('cloudDot'), lab=document.getElementById('cloudLabel'), btn=document.getElementById('cloudBtn');
@@ -1136,19 +1206,29 @@ function cloudClick(){
   cloudPush(true);
 }
 async function cloudInit(){
-  if(!FIRE_ON){ setCloud('local'); return; }
+  if(!FIRE_ON){ setCloud('local'); showLogin(false); return; }
   try{
     if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    fdb=firebase.database(); fauth=firebase.auth();
-    try{ fst=firebase.storage(); }catch(e){ fst=null; }
+    fauth=firebase.auth();
     setCloud('connecting');
-    try{ await fauth.signInAnonymously(); }catch(e){ /* login anônimo indisponível — segue sem auth, pois as regras de obras_rm são públicas */ }
-    cloudListen();
-    window.addEventListener('online', ()=>{ setCloud('online'); cloudPushSoon(); });
+    window.addEventListener('online', ()=>{ if(fdb){ setCloud('online'); cloudPushSoon(); } });
     window.addEventListener('offline', ()=>setCloud('offline'));
-    setCloud(navigator.onLine?'online':'offline');
-    cloudPushSoon();
-  }catch(e){ setCloud('error'); }
+    fauth.onAuthStateChanged(user=>{
+      if(user){
+        fdb=firebase.database();
+        try{ fst=firebase.storage(); }catch(e){ fst=null; }
+        showLogin(false);
+        cloudListen();
+        setCloud(navigator.onLine?'online':'offline');
+        cloudPushSoon();
+      }else{
+        if(fdb){ try{ fdb.ref(COL).off(); }catch(e){} }
+        fdb=null; fst=null; _lastPushed={}; _cloudKnown=new Set();
+        setCloud('local');
+        showLogin(true);
+      }
+    });
+  }catch(e){ setCloud('error'); showLogin(true); }
 }
 function cloudContent(o){ const c=JSON.parse(JSON.stringify(o)); (c.fornecedores||[]).forEach(f=>{ if(f.anexo) delete f.anexo.dados; }); delete c._open; delete c._updatedAt; return c; }
 function cloudDeserialize(d){ const o=JSON.parse(JSON.stringify(d)); o._updatedAt=d.updatedAt||0; return o; }
