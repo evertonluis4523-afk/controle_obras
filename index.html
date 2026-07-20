@@ -1221,7 +1221,8 @@ cloudInit();
 
 /* ================= PWA: instalar como app + offline ================= */
 if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+  if(location.protocol.startsWith('http')){ window.addEventListener('load',()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
+  else { navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{}); }
 }
 </script>
 <!-- Ajuste de tela (mobile) -->
