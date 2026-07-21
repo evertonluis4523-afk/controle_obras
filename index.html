@@ -510,7 +510,6 @@ table.items td.l{text-align:left}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <script>
 
@@ -788,7 +787,7 @@ function parcelaRow(o,p){
 }
 
 function fornRow(o,f){
-  const hasFile=f.anexo&&f.anexo.dados;
+  const hasFile=f.anexo&&(f.anexo.dados||f.anexo.synced);
   const dd=isDupForn(f,_dk);
   const anexoBtn=hasFile
     ? `<button class="linkbtn has" title="${escapeAttr(f.anexo.nome)}" onclick="verNF('${o.id}','${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Ver NF</button> <button class="del" title="Remover anexo" onclick="removeNF('${o.id}','${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>`
@@ -971,19 +970,36 @@ function chaveFromXML(txt){
   if(m)return m[1].toUpperCase();
   return '';
 }
-function removeNF(id,fid){ const o=obraById(id); const f=o&&(o.fornecedores||[]).find(x=>x.id===fid); if(!f)return; if(!confirm('Remover o anexo "'+(f.anexo&&f.anexo.nome)+'"?'))return; f.anexo=null; save(); render(); }
+function removeNF(id,fid){ const o=obraById(id); const f=o&&(o.fornecedores||[]).find(x=>x.id===fid); if(!f)return; if(!confirm('Remover o anexo "'+(f.anexo&&f.anexo.nome)+'"?'))return; f.anexo=null; save(); render(); if(fdb) fdb.ref(ANEXOS_COL+'/'+id+'/'+fid).remove().catch(()=>{}); }
 function dataURLtoBlob(dataURL){ const parts=dataURL.split(','); const mime=(parts[0].match(/:(.*?);/)||[])[1]||'application/octet-stream'; const bin=atob(parts[1]); const arr=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i); return new Blob([arr],{type:mime}); }
 let _nfUrl=null, _nfDl=null;
-function verNF(id,fid){
+// Busca o anexo no no da nuvem (obras_rm_anexos) quando ele foi sincronizado
+// mas ainda nao tem uma copia local nesse aparelho -- cacheia depois de
+// baixar, pra nao precisar buscar de novo.
+async function fetchAnexoRemoto(id,fid){
+  const o=obraById(id); const f=o&&(o.fornecedores||[]).find(x=>x.id===fid); if(!f||!f.anexo)return null;
+  if(f.anexo.dados)return f.anexo;
+  if(!f.anexo.synced||!fdb)return null;
+  const snap=await fdb.ref(ANEXOS_COL+'/'+id+'/'+fid).once('value');
+  const d=snap.val(); if(!d||!d.dados)return null;
+  f.anexo.dados=d.dados; if(d.nome)f.anexo.nome=d.nome; if(d.tipo)f.anexo.tipo=d.tipo;
+  persist();
+  return f.anexo;
+}
+async function verNF(id,fid){
   const o=obraById(id); const f=o&&(o.fornecedores||[]).find(x=>x.id===fid); if(!f||!f.anexo)return;
-  const nome=f.anexo.nome||('NF_'+(f.numeroNF||'documento'));
-  const tipo=(f.anexo.tipo||'').toLowerCase();
+  let anexo=f.anexo;
+  if(!anexo.dados){
+    if(!anexo.synced){ toast('Anexo indisponivel'); return; }
+    toast('Carregando anexo…');
+    try{ anexo=await fetchAnexoRemoto(id,fid); }catch(e){ anexo=null; }
+    if(!anexo||!anexo.dados){ toast('Nao foi possivel carregar o anexo (verifique a conexao)'); return; }
+  }
+  const nome=anexo.nome||('NF_'+(f.numeroNF||'documento'));
+  const tipo=(anexo.tipo||'').toLowerCase();
   let src='';
-  try{
-    if(f.anexo.dados){ closeNF(); const blob=dataURLtoBlob(f.anexo.dados); _nfUrl=URL.createObjectURL(blob); src=_nfUrl; }
-    else if(f.anexo.url){ src=f.anexo.url; }
-    else return;
-  }catch(e){ toast('Nao foi possivel abrir o anexo'); return; }
+  try{ closeNF(); const blob=dataURLtoBlob(anexo.dados); _nfUrl=URL.createObjectURL(blob); src=_nfUrl; }
+  catch(e){ toast('Nao foi possivel abrir o anexo'); return; }
   _nfDl={src:src, nome:nome};
   const body=document.getElementById('nfBody');
   const isImg=/^image\//.test(tipo)||/\.(png|jpe?g|gif|webp|bmp)$/i.test(nome);
@@ -1126,8 +1142,19 @@ async function shareReport(htmlStr,filename,title){
   setTimeout(()=>URL.revokeObjectURL(a.href),3000); toast('Relatório baixado');
 }
 
-function relObra(id){ const o=obraById(id); if(!o)return; shareReport(buildReportHTML([o],'Relatório da obra: '+(o.nome||'sem nome')),'relatorio_'+slug(o.nome)+'.html','Relatório '+(o.nome||'obra')); }
-function relTodas(){ if(!S.obras.length){toast('Nenhuma obra cadastrada');return;} shareReport(buildReportHTML(S.obras,'Relatório geral de obras'),'relatorios_obras_'+new Date().toISOString().slice(0,10)+'.html','Relatórios de obras'); }
+// Antes de montar o relatorio, busca na nuvem qualquer anexo que so exista
+// remotamente nesse aparelho (sincronizado mas nunca aberto por aqui) --
+// assim o relatorio sai completo mesmo gerado de um aparelho diferente do
+// que anexou a NF originalmente.
+async function garantirAnexosCarregados(list){
+  const jobs=[];
+  list.forEach(o=>(o.fornecedores||[]).forEach(f=>{
+    if(f.anexo&&!f.anexo.dados&&f.anexo.synced) jobs.push(fetchAnexoRemoto(o.id,f.id).catch(()=>null));
+  }));
+  if(jobs.length){ toast('Carregando '+jobs.length+' anexo(s)…'); await Promise.all(jobs); }
+}
+async function relObra(id){ const o=obraById(id); if(!o)return; await garantirAnexosCarregados([o]); shareReport(buildReportHTML([o],'Relatório da obra: '+(o.nome||'sem nome')),'relatorio_'+slug(o.nome)+'.html','Relatório '+(o.nome||'obra')); }
+async function relTodas(){ if(!S.obras.length){toast('Nenhuma obra cadastrada');return;} await garantirAnexosCarregados(S.obras); shareReport(buildReportHTML(S.obras,'Relatório geral de obras'),'relatorios_obras_'+new Date().toISOString().slice(0,10)+'.html','Relatórios de obras'); }
 
 /* ================= backup ================= */
 function exportJSON(){
@@ -1164,7 +1191,12 @@ const firebaseConfig = {
 };
 const FIRE_ON = !!(firebaseConfig.databaseURL && firebaseConfig.apiKey && typeof firebase!=='undefined');
 const COL='obras_rm';
-let fdb=null, fst=null, fauth=null, cloudState='local';
+// Anexos de NF ficam num no separado, so buscado sob demanda (abrir/baixar/
+// relatorio) -- assim o arquivo em si nao pesa na leitura normal da obra,
+// mas existe de verdade na nuvem (sem depender do Firebase Storage, que
+// exige o plano Blaze).
+const ANEXOS_COL='obras_rm_anexos';
+let fdb=null, fauth=null, cloudState='local';
 let _lastPushed={}, _cloudKnown=new Set(), pushT=null, _applyingRemote=false;
 
 /* ================= AUTH ================= */
@@ -1216,21 +1248,20 @@ async function cloudInit(){
     fauth.onAuthStateChanged(user=>{
       if(user){
         fdb=firebase.database();
-        try{ fst=firebase.storage(); }catch(e){ fst=null; }
         showLogin(false);
         cloudListen();
         setCloud(navigator.onLine?'online':'offline');
         cloudPushSoon();
       }else{
         if(fdb){ try{ fdb.ref(COL).off(); }catch(e){} }
-        fdb=null; fst=null; _lastPushed={}; _cloudKnown=new Set();
+        fdb=null; _lastPushed={}; _cloudKnown=new Set();
         setCloud('local');
         showLogin(true);
       }
     });
   }catch(e){ setCloud('error'); showLogin(true); }
 }
-function cloudContent(o){ const c=JSON.parse(JSON.stringify(o)); (c.fornecedores||[]).forEach(f=>{ if(f.anexo) delete f.anexo.dados; }); delete c._open; delete c._updatedAt; return c; }
+function cloudContent(o){ const c=JSON.parse(JSON.stringify(o)); (c.fornecedores||[]).forEach(f=>{ if(f.anexo){ delete f.anexo.dados; delete f.anexo.url; delete f.anexo.path; delete f.anexo._uploadFailed; } }); delete c._open; delete c._updatedAt; return c; }
 function cloudDeserialize(d){ const o=JSON.parse(JSON.stringify(d)); o._updatedAt=d.updatedAt||0; return o; }
 function cloudPushSoon(){ if(!fdb||_applyingRemote)return; clearTimeout(pushT); pushT=setTimeout(()=>cloudPush(false),900); }
 
@@ -1243,11 +1274,12 @@ async function cloudPush(manual){
     const cur=new Set(S.obras.map(o=>o.id));
     for(const id of [..._cloudKnown]){ if(!cur.has(id)){ await fdb.ref(COL+'/'+id).remove().catch(()=>{}); _cloudKnown.delete(id); delete _lastPushed[id]; } }
     for(const o of S.obras){
-      if(fst && fauth && fauth.currentUser){
-        for(const f of (o.fornecedores||[])){
-          if(f.anexo&&f.anexo.dados&&!f.anexo.url&&!f.anexo._uploadFailed){
-            try{ const ref=fst.ref(COL+'/'+o.id+'/'+f.id); await ref.putString(f.anexo.dados,'data_url',{contentType:f.anexo.tipo||'application/octet-stream'}); f.anexo.url=await ref.getDownloadURL(); f.anexo.path=ref.fullPath; persist(); }catch(e){ f.anexo._uploadFailed=true; }
-          }
+      for(const f of (o.fornecedores||[])){
+        if(f.anexo&&f.anexo.dados&&!f.anexo.synced){
+          try{
+            await fdb.ref(ANEXOS_COL+'/'+o.id+'/'+f.id).set({nome:f.anexo.nome||'',tipo:f.anexo.tipo||'',dados:f.anexo.dados});
+            f.anexo.synced=true; persist();
+          }catch(e){ /* tenta de novo no proximo ciclo de sync */ }
         }
       }
       const content=cloudContent(o); const js=JSON.stringify(content);
