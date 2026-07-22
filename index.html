@@ -394,6 +394,27 @@ table.items td.l{text-align:left}
 .pbtn svg{width:14px;height:14px}
 .pbtn.rep{background:var(--red);border-color:var(--red);color:#fff}
 .pbtn:hover{filter:brightness(.97)}
+
+/* ===== Busca de NF ===== */
+.bnf-search{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);border-radius:11px;background:var(--surface);padding:11px 14px;box-shadow:var(--shadow)}
+.bnf-search:focus-within{border-color:var(--red)}
+.bnf-search svg{width:18px;height:18px;color:var(--muted);flex:0 0 auto}
+.bnf-search input{flex:1;border:0;outline:0;background:transparent;font-size:15px;color:var(--ink)}
+.bnf-search .bnf-clear{border:0;background:transparent;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:0 4px}
+.bnf-search .bnf-clear:hover{color:var(--red)}
+.bnf-count{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:16px 2px 8px}
+.bnf-hint{text-align:center;color:var(--muted);font-size:13px;line-height:1.7;padding:34px 16px}
+.bnf-hint span{font-size:12px;font-family:var(--mono)}
+.bnf-list{display:flex;flex-direction:column;gap:8px}
+.bnf-row{display:grid;grid-template-columns:1fr auto;gap:10px 14px;align-items:center;border:1px solid var(--line);border-left:3px solid var(--red);border-radius:11px;background:var(--surface);padding:12px 15px;box-shadow:var(--shadow)}
+.bnf-nf{font-family:var(--mono);font-weight:800;font-size:14.5px;color:var(--ink)}
+.bnf-chave{font-family:var(--mono);font-weight:600;font-size:11px;color:var(--muted);margin-left:6px}
+.bnf-meta{font-size:12.5px;color:var(--gray);margin-top:3px}
+.bnf-obra{font-size:12px;color:var(--muted);margin-top:3px}
+.bnf-sem{color:var(--muted);font-style:italic;font-weight:500}
+.bnf-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.bnf-acts .pbtn{flex:0 0 auto}
+@media(max-width:560px){ .bnf-row{grid-template-columns:1fr} .bnf-acts{justify-content:flex-start} .bnf-acts .pbtn{flex:1} }
 .pfoot{display:grid;grid-template-columns:1fr auto;gap:8px 14px;padding:14px 16px;background:var(--ink);color:#fff}
 .pfoot .l{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#aeb4bd;font-weight:700;align-self:center}
 .pfoot .grid{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:4px}
@@ -467,6 +488,7 @@ table.items td.l{text-align:left}
   <div class="viewtabs">
     <button class="vtab" id="tabPainel" onclick="setView('painel')">Painel</button>
     <button class="vtab" id="tabDetalhe" onclick="setView('detalhe')">Detalhe / edição</button>
+    <button class="vtab" id="tabBusca" onclick="setView('busca')">Buscar NF</button>
   </div>
 
   <div id="dupBanner" class="dupbanner" style="display:none"></div>
@@ -474,6 +496,7 @@ table.items td.l{text-align:left}
   <div class="wrap" style="margin:0;padding:0 18px 26px">
     <div class="painel" id="painel"></div>
     <div class="obras" id="obras"></div>
+    <div class="busca" id="buscaNF"></div>
   </div>
 
   <div class="sheetfoot">
@@ -634,11 +657,14 @@ function openDetalhe(id){ const o=obraById(id); if(o)o._open=true; VIEW='detalhe
 function render(){
   _dk=dupKeys();
   renderKpis();
-  const painel=document.getElementById('painel'), obras=document.getElementById('obras');
+  const painel=document.getElementById('painel'), obras=document.getElementById('obras'), busca=document.getElementById('buscaNF');
   document.getElementById('tabPainel').classList.toggle('on',VIEW==='painel');
   document.getElementById('tabDetalhe').classList.toggle('on',VIEW==='detalhe');
-  if(VIEW==='painel'){ painel.style.display='block'; obras.style.display='none'; renderPainel(); }
-  else { painel.style.display='none'; obras.style.display='block'; renderObras(); }
+  document.getElementById('tabBusca').classList.toggle('on',VIEW==='busca');
+  painel.style.display='none'; obras.style.display='none'; busca.style.display='none';
+  if(VIEW==='painel'){ painel.style.display='block'; renderPainel(); }
+  else if(VIEW==='busca'){ busca.style.display='block'; renderBuscaNF(); }
+  else { obras.style.display='block'; renderObras(); }
   updateDupBanner();
 }
 
@@ -677,6 +703,66 @@ function renderPainel(){
       </div>
     </div>
   </div>`;
+}
+
+/* ============ Busca de nota fiscal em todas as obras ============ */
+let _buscaQ='';
+function renderBuscaNF(){
+  const wrap=document.getElementById('buscaNF');
+  // Monta o shell só uma vez; digitar atualiza só a lista (preserva o foco).
+  if(!document.getElementById('bnfInput')){
+    wrap.innerHTML=`<div class="bnf">
+      <div class="bnf-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="bnfInput" type="search" placeholder="Número da NF, chave ou fornecedor — procura em todas as obras" oninput="_buscaQ=this.value;updateBuscaResults()" value="${escapeAttr(_buscaQ)}">
+        <button class="bnf-clear" title="Limpar" onclick="_buscaQ='';document.getElementById('bnfInput').value='';updateBuscaResults();document.getElementById('bnfInput').focus()">&times;</button>
+      </div>
+      <div class="bnf-results" id="bnfResults"></div>
+    </div>`;
+  }
+  updateBuscaResults();
+  const inp=document.getElementById('bnfInput'); if(inp) setTimeout(()=>inp.focus(),40);
+}
+function updateBuscaResults(){
+  const host=document.getElementById('bnfResults'); if(!host)return;
+  const raw=(_buscaQ||'').trim();
+  if(!raw){
+    const totalNF=S.obras.reduce((s,o)=>s+(o.fornecedores||[]).filter(f=>f.numeroNF||f.chave||(f.anexo&&(f.anexo.dados||f.anexo.synced))).length,0);
+    host.innerHTML=`<div class="bnf-hint">Digite o número da nota para localizá-la em qualquer obra.<br><span>${totalNF} nota(s) cadastrada(s) em ${S.obras.length} obra(s).</span></div>`;
+    return;
+  }
+  const qn=normNum(raw), ql=raw.toLowerCase();
+  const hits=[];
+  S.obras.forEach(o=>{
+    (o.fornecedores||[]).forEach(f=>{
+      const nf=normNum(f.numeroNF), chave=String(f.chave||'').replace(/\s+/g,'');
+      const matchNF = nf && qn && nf.includes(qn);
+      const matchChave = chave && qn && chave.includes(qn);
+      const matchForn = f.nome && f.nome.toLowerCase().includes(ql);
+      if(matchNF||matchChave||matchForn) hits.push({o,f,matchNF,matchChave,matchForn});
+    });
+  });
+  if(!hits.length){ host.innerHTML=`<div class="bnf-hint">Nenhuma nota encontrada para <b>"${escapeAttr(raw)}"</b>.<br><span>Confira o número, ou tente parte da chave ou o nome do fornecedor.</span></div>`; return; }
+  // NF exatas primeiro, depois por obra
+  hits.sort((a,b)=>(b.matchNF?1:0)-(a.matchNF?1:0));
+  const rows=hits.map(({o,f})=>{
+    const hasFile=f.anexo&&(f.anexo.dados||f.anexo.synced);
+    const nfTxt=f.numeroNF?escapeAttr(f.numeroNF):'<span class="bnf-sem">sem número</span>';
+    const chaveTxt=f.chave?`<span class="bnf-chave" title="${escapeAttr(f.chave)}">chave …${escapeAttr(String(f.chave).replace(/\s+/g,'').slice(-8))}</span>`:'';
+    const anexoBtn=hasFile?`<button class="pbtn" onclick="verNF('${o.id}','${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Ver NF</button>`:'';
+    return `<div class="bnf-row">
+      <div class="bnf-main">
+        <div class="bnf-nf">NF ${nfTxt} ${chaveTxt}</div>
+        <div class="bnf-meta"><b>${escapeAttr(f.nome)||'<span class="bnf-sem">fornecedor sem nome</span>'}</b>${f.valor?' · '+brl(f.valor):''}${f.dataNF?' · '+escapeAttr(f.dataNF):''}</div>
+        <div class="bnf-obra">Obra: <b>${escapeAttr(o.nome)||'sem nome'}</b>${o.cliente?' · '+escapeAttr(o.cliente):''}</div>
+      </div>
+      <div class="bnf-acts">
+        <button class="pbtn rep" onclick="openDetalhe('${o.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>Abrir obra</button>
+        ${anexoBtn}
+      </div>
+    </div>`;
+  }).join('');
+  host.innerHTML=`<div class="bnf-count">${hits.length} nota(s) encontrada(s)</div><div class="bnf-list">${rows}</div>`;
 }
 
 function renderKpis(){
