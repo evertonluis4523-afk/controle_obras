@@ -641,6 +641,24 @@ function render(){
   else { painel.style.display='none'; obras.style.display='block'; renderObras(); }
   updateDupBanner();
 }
+// Reconstruir a lista com innerHTML apaga o campo que está sendo digitado.
+// Pra atualizações que chegam da nuvem (outra pessoa/aba editando ao mesmo
+// tempo), adiamos o render enquanto houver um campo da lista em foco e só
+// redesenhamos quando o foco sair — assim a digitação e o Tab não são
+// interrompidos no meio.
+let _pendingRender=false;
+function editingInList(){
+  const a=document.activeElement; if(!a)return false;
+  const t=a.tagName; if(t!=='INPUT'&&t!=='TEXTAREA'&&t!=='SELECT')return false;
+  return !!(a.closest && a.closest('#obras, #painel'));
+}
+function renderSafe(){ if(editingInList()){ _pendingRender=true; return; } render(); }
+document.addEventListener('focusout',()=>{
+  if(!_pendingRender)return;
+  // espera o foco assentar: se foi um Tab pro próximo campo da lista, mantém
+  // adiado; só redesenha quando o foco realmente saiu dos campos.
+  setTimeout(()=>{ if(_pendingRender && !editingInList()){ _pendingRender=false; render(); } },0);
+});
 
 function renderPainel(){
   const wrap=document.getElementById('painel');
@@ -1304,8 +1322,16 @@ async function cloudPush(manual){
       const content=cloudContent(o); const js=JSON.stringify(content);
       if(_lastPushed[o.id]!==js){
         const doc=Object.assign({},content,{updatedAt:Date.now()});
-        await fdb.ref(COL+'/'+o.id).set(doc);
+        // IMPORTANTE: marca como "já aplicado localmente" ANTES do await.
+        // O Firebase dispara o child_changed do nosso próprio write de forma
+        // otimista (antes de o await resolver); se _updatedAt/_lastPushed só
+        // fossem atualizados depois, o guard não reconheceria que é o nosso
+        // eco e rodaria um render() no meio da digitação, tirando o foco do
+        // campo. Em caso de falha no set, desfaz pra tentar de novo depois.
+        const prevUp=o._updatedAt, prevJs=_lastPushed[o.id];
         o._updatedAt=doc.updatedAt; _lastPushed[o.id]=js;
+        try{ await fdb.ref(COL+'/'+o.id).set(doc); }
+        catch(e){ o._updatedAt=prevUp; _lastPushed[o.id]=prevJs; throw e; }
       }
       _cloudKnown.add(o.id);
     }
@@ -1319,27 +1345,27 @@ function cloudListen(){
   colRef.on('child_added', snap=>{
     const id=snap.key, d=snap.val(); if(!d)return;
     const local=obraById(id);
-    if(!local){ const no=cloudDeserialize(d); S.obras.unshift(no); _lastPushed[id]=JSON.stringify(cloudContent(no)); _cloudKnown.add(id); _applyingRemote=true; persist(); render(); _applyingRemote=false; }
+    if(!local){ const no=cloudDeserialize(d); S.obras.unshift(no); _lastPushed[id]=JSON.stringify(cloudContent(no)); _cloudKnown.add(id); _applyingRemote=true; persist(); renderSafe(); _applyingRemote=false; }
     else{ _cloudKnown.add(id); if(!_lastPushed[id])_lastPushed[id]=JSON.stringify(cloudContent(local)); }
     setCloud(navigator.onLine?'online':'offline');
   }, err=>{ setCloud('error'); });
   colRef.on('child_changed', snap=>{
     const id=snap.key, d=snap.val(); if(!d)return;
     const local=obraById(id);
-    if(!local){ const no=cloudDeserialize(d); S.obras.unshift(no); _lastPushed[id]=JSON.stringify(cloudContent(no)); _cloudKnown.add(id); _applyingRemote=true; persist(); render(); _applyingRemote=false; return; }
+    if(!local){ const no=cloudDeserialize(d); S.obras.unshift(no); _lastPushed[id]=JSON.stringify(cloudContent(no)); _cloudKnown.add(id); _applyingRemote=true; persist(); renderSafe(); _applyingRemote=false; return; }
     if((d.updatedAt||0)>(local._updatedAt||0)){
       const files={}; (local.fornecedores||[]).forEach(f=>{ if(f.anexo&&f.anexo.dados)files[f.id]=f.anexo.dados; });
       Object.assign(local, cloudDeserialize(d));
       (local.fornecedores||[]).forEach(f=>{ if(f.anexo&&!f.anexo.dados&&files[f.id])f.anexo.dados=files[f.id]; });
       _lastPushed[id]=JSON.stringify(cloudContent(local)); _cloudKnown.add(id);
-      _applyingRemote=true; persist(); render(); _applyingRemote=false;
+      _applyingRemote=true; persist(); renderSafe(); _applyingRemote=false;
     }
     setCloud(navigator.onLine?'online':'offline');
   }, err=>{ setCloud('error'); });
   colRef.on('child_removed', snap=>{
     const id=snap.key;
     const i=S.obras.findIndex(o=>o.id===id);
-    if(i>=0){ S.obras.splice(i,1); _applyingRemote=true; persist(); render(); _applyingRemote=false; }
+    if(i>=0){ S.obras.splice(i,1); _applyingRemote=true; persist(); renderSafe(); _applyingRemote=false; }
     _cloudKnown.delete(id); delete _lastPushed[id];
     setCloud(navigator.onLine?'online':'offline');
   }, err=>{ setCloud('error'); });
