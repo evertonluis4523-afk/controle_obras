@@ -328,6 +328,20 @@ table.items td.l{text-align:left}
 .tbl input.chk{width:auto}
 .tbl .empty td{color:var(--muted);text-align:center;padding:14px;font-size:12.5px}
 .tbl tr.chrow td{border-bottom:1px solid var(--line-2);padding-top:0;padding-bottom:10px;background:#fcfcfd}
+/* Notas em "cartão" com tom alternado (Opção D): cada nota = linha do
+   fornecedor (.main) + linha da chave (.chrow) viram um bloco com borda
+   arredondada e espaço em volta; blocos alternam de tom pra separar. Só
+   vale pra tabela de notas (.notas); as parcelas seguem iguais. */
+.tbl.notas{border-collapse:separate;border-spacing:0 9px}
+.tbl.notas td{border-bottom:0}
+.tbl.notas tr.main td{border-top:1px solid var(--line);padding-top:11px;background:#fff}
+.tbl.notas tr.chrow td{border-bottom:1px solid var(--line);padding-bottom:12px;background:#fcfcfd}
+.tbl.notas tr.main td:first-child{border-left:1px solid var(--line);border-top-left-radius:10px}
+.tbl.notas tr.main td:last-child{border-right:1px solid var(--line);border-top-right-radius:10px}
+.tbl.notas tr.chrow td:first-child{border-left:1px solid var(--line);border-bottom-left-radius:10px}
+.tbl.notas tr.chrow td:last-child{border-right:1px solid var(--line);border-bottom-right-radius:10px}
+.tbl.notas tr.g-odd.main td{background:#faf7f6}
+.tbl.notas tr.g-odd.chrow td{background:#f5efee}
 .chave-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .chave-lab{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;flex:none}
 .chave-in{flex:1;min-width:180px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;background:#fff;letter-spacing:.02em}
@@ -740,7 +754,7 @@ function obraCard(o){
   const c=calcObra(o);
   const parcRows=(o.parcelas||[]).length ? o.parcelas.map(p=>parcelaRow(o,p)).join('')
     : `<tr class="empty"><td colspan="5">Nenhuma parcela. Adicione abaixo.</td></tr>`;
-  const fornRows=(o.fornecedores||[]).length ? o.fornecedores.map(f=>fornRow(o,f)).join('')
+  const fornRows=(o.fornecedores||[]).length ? o.fornecedores.map((f,i)=>fornRow(o,f,i)).join('')
     : `<tr class="empty"><td colspan="5">Nenhum fornecedor / nota lancada.</td></tr>`;
   const gradAlert=c.faltaNota>0.005?'alert':'';
   return `
@@ -771,7 +785,7 @@ function obraCard(o){
 
       <div class="osec">
         <div class="secttl">Fornecedores &middot; Notas fiscais</div>
-        <table class="tbl">
+        <table class="tbl notas">
           <thead><tr><th>Fornecedor</th><th class="colmoney r">Valor</th><th class="colnf">Nº nota fiscal</th><th class="coldate">Data da NF</th><th class="colact">Anexo NF</th><th style="width:40px"></th></tr></thead>
           <tbody>${fornRows}</tbody>
         </table>
@@ -808,13 +822,16 @@ function parcelaRow(o,p){
   </tr>`;
 }
 
-function fornRow(o,f){
+function fornRow(o,f,idx){
   const hasFile=f.anexo&&(f.anexo.dados||f.anexo.synced);
   const dd=isDupForn(f,_dk);
+  // Cada nota (linha do fornecedor + linha da chave) forma um "cartão", com
+  // tom alternado entre uma nota e outra pra separar visualmente.
+  const par=((idx||0)%2===1)?'g-odd':'g-even';
   const anexoBtn=hasFile
     ? `<button class="linkbtn has" title="${escapeAttr(f.anexo.nome)}" onclick="verNF('${o.id}','${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Ver NF</button> <button class="del" title="Remover anexo" onclick="removeNF('${o.id}','${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg></button>`
     : `<button class="linkbtn" onclick="document.getElementById('nf_${f.id}').click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>Anexar</button><input type="file" id="nf_${f.id}" class="hidden" accept="application/pdf,image/*" onchange="anexarNF('${o.id}','${f.id}',event)">`;
-  return `<tr>
+  return `<tr class="main ${par}">
     <td><input value="${escapeAttr(f.nome)}" oninput="setF('${o.id}','${f.id}','nome',this.value)" onchange="revalidateNF('${o.id}','${f.id}')" placeholder="Nome do fornecedor"></td>
     <td class="r"><input class="money" inputmode="decimal" value="${f.valor?num(f.valor):''}" onchange="setFMoney('${o.id}','${f.id}',this)" placeholder="0,00"></td>
     <td><input id="nfnum_${f.id}" class="nf${dd.dupNum?' dup':''}" value="${escapeAttr(f.numeroNF)}" oninput="setF('${o.id}','${f.id}','numeroNF',this.value)" onchange="revalidateNF('${o.id}','${f.id}')" placeholder="000000"><div class="dupwarn" id="dupw_${f.id}"${(dd.dupNum||dd.dupChv)?'':' style="display:none"'}>${dd.dupChv&&!dd.dupNum?'Chave repetida':'NF repetida'}</div></td>
@@ -822,7 +839,7 @@ function fornRow(o,f){
     <td class="r anexocell" title="Também dá pra arrastar o arquivo baixado direto pra cá" ondragover="event.preventDefault();this.classList.add('dragover')" ondragleave="this.classList.remove('dragover')" ondrop="dropAnexoFile('${o.id}','${f.id}',event)">${anexoBtn}</td>
     <td class="r"><button class="del" onclick="removeForn('${o.id}','${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button></td>
   </tr>
-  <tr class="chrow"><td colspan="6">
+  <tr class="chrow ${par}"><td colspan="6">
     <div class="chave-wrap">
       <span class="chave-lab">Chave NF-e</span>
       <input id="chvin_${f.id}" class="chave-in mono${dd.dupChv?' dup':''}" maxlength="60" value="${escapeAttr(f.chave)}" oninput="setF('${o.id}','${f.id}','chave',this.value)" onchange="cleanChave('${o.id}','${f.id}',this)" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}" placeholder="Cole, escaneie (leitor USB) ou digite a chave de 44 caracteres">
