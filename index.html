@@ -332,16 +332,21 @@ table.items td.l{text-align:left}
    fornecedor (.main) + linha da chave (.chrow) viram um bloco com borda
    arredondada e espaço em volta; blocos alternam de tom pra separar. Só
    vale pra tabela de notas (.notas); as parcelas seguem iguais. */
-.tbl.notas{border-collapse:separate;border-spacing:0 9px}
+.tbl.notas{border-collapse:separate;border-spacing:0}
+.tbl.notas thead th{padding-bottom:10px}
 .tbl.notas td{border-bottom:0}
-.tbl.notas tr.main td{border-top:1px solid var(--line);padding-top:11px;background:#fff}
-.tbl.notas tr.chrow td{border-bottom:1px solid var(--line);padding-bottom:12px;background:#fcfcfd}
+/* linha do fornecedor = topo do cartão */
+.tbl.notas tr.main td{border-top:1px solid var(--line);padding-top:10px;background:#fff}
 .tbl.notas tr.main td:first-child{border-left:1px solid var(--line);border-top-left-radius:10px}
 .tbl.notas tr.main td:last-child{border-right:1px solid var(--line);border-top-right-radius:10px}
+/* linha da chave = base do cartão: MESMA cor, colada (sem linha no meio) */
+.tbl.notas tr.chrow td{border-bottom:1px solid var(--line);padding-bottom:11px;background:#fff}
 .tbl.notas tr.chrow td:first-child{border-left:1px solid var(--line);border-bottom-left-radius:10px}
 .tbl.notas tr.chrow td:last-child{border-right:1px solid var(--line);border-bottom-right-radius:10px}
-.tbl.notas tr.g-odd.main td{background:#faf7f6}
-.tbl.notas tr.g-odd.chrow td{background:#f5efee}
+/* cartões ímpares em rosé — as duas linhas exatamente na mesma cor */
+.tbl.notas tr.g-odd.main td,.tbl.notas tr.g-odd.chrow td{background:#faf7f6}
+/* o respiro fica só ENTRE um cartão e outro, nunca dentro */
+.tbl.notas tr.cardgap td{height:9px;padding:0;border:0;background:transparent}
 .chave-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .chave-lab{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;flex:none}
 .chave-in{flex:1;min-width:180px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px;background:#fff;letter-spacing:.02em}
@@ -849,7 +854,8 @@ function fornRow(o,f,idx){
       <button class="btn-sm nowrap" onclick="colarChave('${o.id}','${f.id}')" title="Colar da área de transferência"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>Colar</button>
       <button class="btn-sm red nowrap" onclick="puxarDanfe('${o.id}','${f.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Puxar DANFE</button>
     </div>
-  </td></tr>`;
+  </td></tr>
+  <tr class="cardgap"><td colspan="6"></td></tr>`;
 }
 
 /* ================= mutations ================= */
